@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NovaSupport — AI Customer Support</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #0f1117;
+      --surface:  #1a1d27;
+      --border:   #2a2d3e;
+      --accent:   #6366f1;
+      --accent2:  #8b5cf6;
+      --green:    #22c55e;
+      --yellow:   #f59e0b;
+      --red:      #ef4444;
+      --text:     #e2e8f0;
+      --muted:    #64748b;
+      --card-bg:  #20243a;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ── */
+    header {
+      background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 1rem 2rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      box-shadow: 0 4px 20px rgba(99,102,241,0.15);
+    }
+    header .logo { font-size: 1.6rem; }
+    header h1 { font-size: 1.3rem; font-weight: 700; color: #fff; }
+    header p  { font-size: 0.8rem; color: #a5b4fc; }
+    .status-badge {
+      margin-left: auto;
+      font-size: 0.75rem;
+      padding: 0.25rem 0.75rem;
+      border-radius: 999px;
+      background: rgba(34,197,94,0.15);
+      border: 1px solid rgba(34,197,94,0.3);
+      color: var(--green);
+    }
+
+    /* ── Main layout ── */
+    main {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      gap: 0;
+      max-height: calc(100vh - 70px);
+    }
+
+    /* ── Left panel (form) ── */
+    .form-panel {
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.2rem;
+      overflow-y: auto;
+    }
+    .form-panel h2 { font-size: 1rem; font-weight: 600; color: #a5b4fc; }
+
+    .field label {
+      display: block;
+      font-size: 0.78rem;
+      font-weight: 500;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.4rem;
+    }
+    .field input, .field textarea, .field select {
+      width: 100%;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.65rem 0.9rem;
+      color: var(--text);
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .field input:focus, .field textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(99,102,241,0.12);
+    }
+    .field textarea { resize: vertical; min-height: 110px; font-family: inherit; }
+
+    .scenarios {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+    .scenario-btn {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.5rem 0.75rem;
+      font-size: 0.78rem;
+      color: var(--muted);
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.15s;
+    }
+    .scenario-btn:hover {
+      border-color: var(--accent);
+      color: var(--text);
+      background: rgba(99,102,241,0.08);
+    }
+
+    .submit-btn {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 0.8rem;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+      margin-top: auto;
+    }
+    .submit-btn:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); }
+    .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* ── Right panel (pipeline) ── */
+    .pipeline-panel {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .pipeline-header {
+      padding: 1rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      background: var(--surface);
+    }
+    .pipeline-header h2 { font-size: 1rem; font-weight: 600; color: #a5b4fc; }
+    #pipeline-status {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-left: auto;
+    }
+
+    .steps-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1.25rem 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    /* ── Step cards ── */
+    .step-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem 1.1rem;
+      animation: slideIn 0.35s cubic-bezier(0.16,1,0.3,1);
+      position: relative;
+      overflow: hidden;
+    }
+    .step-card::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 3px;
+      background: var(--accent);
+      border-radius: 3px 0 0 3px;
+    }
+    .step-card.done::before  { background: var(--green); }
+    .step-card.error::before { background: var(--red); }
+    .step-card.escalate::before { background: var(--yellow); }
+
+    .step-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .step-label { font-size: 0.9rem; font-weight: 600; }
+    .step-time  { font-size: 0.72rem; color: var(--muted); margin-left: auto; }
+
+    .step-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+    }
+    .tag {
+      font-size: 0.72rem;
+      padding: 0.18rem 0.55rem;
+      border-radius: 999px;
+      background: rgba(99,102,241,0.12);
+      border: 1px solid rgba(99,102,241,0.25);
+      color: #a5b4fc;
+    }
+    .tag.green {
+      background: rgba(34,197,94,0.12);
+      border-color: rgba(34,197,94,0.25);
+      color: #86efac;
+    }
+    .tag.yellow {
+      background: rgba(245,158,11,0.12);
+      border-color: rgba(245,158,11,0.25);
+      color: #fcd34d;
+    }
+
+    .step-passage {
+      margin-top: 0.5rem;
+      font-size: 0.78rem;
+      color: var(--muted);
+      font-style: italic;
+      line-height: 1.5;
+      border-left: 2px solid var(--border);
+      padding-left: 0.6rem;
+    }
+
+    /* ── Final response ── */
+    .response-panel {
+      border-top: 1px solid var(--border);
+      padding: 1.25rem 1.5rem;
+      background: var(--surface);
+      animation: slideIn 0.4s cubic-bezier(0.16,1,0.3,1);
+    }
+    .response-panel h3 {
+      font-size: 0.9rem;
+      color: #a5b4fc;
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .response-meta {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-bottom: 0.75rem;
+    }
+    #final-response-text {
+      font-size: 0.88rem;
+      line-height: 1.65;
+      color: var(--text);
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.9rem 1rem;
+      white-space: pre-wrap;
+    }
+
+    /* ── Spinner ── */
+    .spinner {
+      display: inline-block;
+      width: 14px; height: 14px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+      gap: 0.75rem;
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+    .empty-state .big { font-size: 2.5rem; }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <span class="logo">🤖</span>
+  <div>
+    <h1>NovaSupport</h1>
+    <p>Event-Driven Multi-Agent AI Support Platform</p>
+  </div>
+  <span class="status-badge">● Live</span>
+</header>
+
+<main>
+  <!-- ── Form panel ── -->
+  <div class="form-panel">
+    <h2>Submit Support Ticket</h2>
+
+    <div class="field">
+      <label>Customer ID</label>
+      <input id="customer-id" type="text" value="C-0001" placeholder="e.g. C-0001" />
+    </div>
+
+    <div class="field">
+      <label>Order ID <span style="color:var(--muted);font-size:0.7rem">(optional)</span></label>
+      <input id="order-id" type="text" value="ORD-0001" placeholder="e.g. ORD-0001" />
+    </div>
+
+    <div class="field">
+      <label>Message</label>
+      <textarea id="message" placeholder="Describe your issue...">My express delivery is 5 days late. I paid extra for express shipping and it still hasn't arrived. I want a refund for the shipping fee.</textarea>
+    </div>
+
+    <div class="field">
+      <label>Quick scenarios</label>
+      <div class="scenarios">
+        <button class="scenario-btn" onclick="setScenario('delay')">📦 Express delivery delayed — want shipping refund</button>
+        <button class="scenario-btn" onclick="setScenario('billing')">💳 Charged twice — duplicate charge on card</button>
+        <button class="scenario-btn" onclick="setScenario('damage')">📭 Received damaged product — want replacement</button>
+        <button class="scenario-btn" onclick="setScenario('inquiry')">❓ General return policy question</button>
+      </div>
+    </div>
+
+    <button class="submit-btn" id="submit-btn" onclick="submitTicket()">
+      Send Ticket →
+    </button>
+  </div>
+
+  <!-- ── Pipeline panel ── -->
+  <div class="pipeline-panel">
+    <div class="pipeline-header">
+      <span>⚡</span>
+      <h2>AI Processing Pipeline</h2>
+      <span id="pipeline-status">Waiting for ticket…</span>
+    </div>
+
+    <div class="steps-container" id="steps-container">
+      <div class="empty-state" id="empty-state">
+        <span class="big">🏗️</span>
+        <span>Submit a ticket to see the AI pipeline in action</span>
+        <span style="font-size:0.75rem">Kafka → LangGraph → LLM → MCP → RAG → Response</span>
+      </div>
+    </div>
+
+    <div id="response-panel" style="display:none" class="response-panel">
+      <h3>📋 Resolution</h3>
+      <div class="response-meta" id="response-meta"></div>
+      <div id="final-response-text"></div>
+    </div>
+  </div>
+</main>
+
+<script>
+  const SCENARIOS = {
+    delay:   { cid: 'C-0001', oid: 'ORD-0001', msg: 'My express delivery is 5 days late. I paid extra for express shipping and it still hasn\'t arrived. I want a refund for the shipping fee.' },
+    billing: { cid: 'C-0001', oid: '',         msg: 'I was charged twice for the same order. I can see two identical charges on my credit card. Please refund the duplicate charge immediately.' },
+    damage:  { cid: 'C-0001', oid: '',         msg: 'The item I received was completely damaged. The box was crushed and the product inside is broken. I need a replacement or a full refund.' },
+    inquiry: { cid: 'C-0001', oid: '',         msg: 'What is your return policy? I bought a product last month and I\'m not happy with it. How long do I have to return it?' },
+  };
+
+  function setScenario(key) {
+    const s = SCENARIOS[key];
+    document.getElementById('customer-id').value = s.cid;
+    document.getElementById('order-id').value    = s.oid;
+    document.getElementById('message').value     = s.msg;
+  }
+
+  let activeSSE = null;
+  let streamDone = false;   // true once workflow sends done=true or completes/escalates
+
+  async function submitTicket() {
+    const customerId = document.getElementById('customer-id').value.trim();
+    const orderId    = document.getElementById('order-id').value.trim();
+    const message    = document.getElementById('message').value.trim();
+
+    if (!customerId || !message) {
+      alert('Customer ID and message are required.');
+      return;
+    }
+
+    // Reset UI
+    streamDone = false;
+    if (activeSSE) { activeSSE.close(); activeSSE = null; }
+    document.getElementById('steps-container').innerHTML = '';
+    document.getElementById('response-panel').style.display = 'none';
+    document.getElementById('empty-state') && document.getElementById('empty-state').remove();
+    setStatus('<span class="spinner"></span> Submitting…', false);
+    document.getElementById('submit-btn').disabled = true;
+
+    // Submit ticket
+    let resp;
+    try {
+      resp = await fetch('/api/v1/tickets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer_id: customerId,
+          order_id: orderId || undefined,
+          message,
+        }),
+      });
+    } catch (e) {
+      setStatus('❌ API not reachable', true);
+      document.getElementById('submit-btn').disabled = false;
+      return;
+    }
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      setStatus('❌ ' + (err.detail || resp.statusText), true);
+      document.getElementById('submit-btn').disabled = false;
+      return;
+    }
+
+    const { workflow_id, ticket_id } = await resp.json();
+    setStatus(`<span class="spinner"></span> Processing <code style="color:#a5b4fc">${ticket_id}</code>`, false);
+
+    addInfoCard(`🎫 Ticket accepted`, [
+      { label: 'Ticket ID',    value: ticket_id,   color: '' },
+      { label: 'Workflow ID',  value: workflow_id.slice(0,16) + '…', color: '' },
+    ]);
+
+    // Open SSE stream
+    openStream(workflow_id);
+  }
+
+  function openStream(workflowId) {
+    const url = `/api/v1/workflows/${workflowId}/stream`;
+    const es  = new EventSource(url);
+    activeSSE = es;
+
+    es.onmessage = (e) => {
+      let event;
+      try { event = JSON.parse(e.data); } catch { return; }
+      handleEvent(event);
+    };
+
+    es.onerror = () => {
+      if (streamDone) return;   // normal close after workflow finished — ignore
+      setStatus('⚠️ Stream connection lost', true);
+      es.close();
+      document.getElementById('submit-btn').disabled = false;
+    };
+  }
+
+  function handleEvent(event) {
+    const { step, label, data, done } = event;
+
+    switch (step) {
+      case 'triage':
+        addStepCard(label, [
+          { label: 'Category', value: formatCategory(data.category), color: 'yellow' },
+          { label: 'Priority', value: data.priority?.toUpperCase(), color: data.priority === 'high' ? 'yellow' : '' },
+          data.requires_order_lookup ? { label: 'DB lookup', value: 'needed', color: '' } : null,
+        ]);
+        break;
+
+      case 'fetch_context':
+        addStepCard(label, [
+          { label: 'Shipping', value: data.shipping_method, color: '' },
+          { label: 'Delay',   value: `${data.days_delayed} days`, color: data.days_delayed > 3 ? 'yellow' : '' },
+          { label: 'Status',  value: data.shipment_status, color: '' },
+          { label: 'Customer', value: data.customer_name || '—', color: '' },
+          { label: 'Tier',    value: data.customer_tier, color: data.customer_tier === 'vip' ? 'green' : '' },
+          { label: '⚡ Parallel', value: `${data.parallel_fetch_ms}ms (3 queries)`, color: 'green' },
+        ]);
+        break;
+
+      case 'retrieve_policy':
+        addStepCard(label, [
+          { label: 'Policy', value: data.policy_id || '—', color: 'green' },
+          { label: 'Sources', value: `${data.num_sources} found`, color: '' },
+        ], data.passage);
+        break;
+
+      case 'resolve':
+        addStepCard(label, [
+          { label: 'Decision',    value: formatAction(data.action), color: 'green' },
+          data.refund_amount > 0
+            ? { label: 'Refund', value: `$${data.refund_amount.toFixed(2)}`, color: 'yellow' }
+            : null,
+          { label: 'Confidence', value: `${(data.confidence * 100).toFixed(0)}%`, color: data.confidence > 0.8 ? 'green' : '' },
+        ]);
+        break;
+
+      case 'generate_response':
+        addStepCard(label, [], data.preview);
+        break;
+
+      case 'quality_check':
+        addStepCard(label, [
+          { label: 'Status', value: data.status, color: data.passed ? 'green' : 'yellow' },
+          { label: data.passed ? '✅ Approved' : '⚠️ Needs review', value: '', color: data.passed ? 'green' : 'yellow' },
+        ]);
+        break;
+
+      case 'complete':
+        streamDone = true;
+        addStepCard(label, [
+          { label: 'Action', value: formatAction(data.final_action), color: 'green' },
+          data.refund_amount > 0
+            ? { label: 'Refund', value: `$${data.refund_amount.toFixed(2)}`, color: 'yellow' }
+            : null,
+        ], null, 'done');
+        showFinalResponse(data.final_action, data.refund_amount, data.final_response);
+        setStatus('✅ Completed', false);
+        if (activeSSE) { activeSSE.close(); activeSSE = null; }
+        document.getElementById('submit-btn').disabled = false;
+        break;
+
+      case 'escalate':
+        streamDone = true;
+        addStepCard(label, [
+          { label: 'Reason', value: 'Quality check failed', color: 'yellow' },
+        ], null, 'escalate');
+        showFinalResponse('escalated', 0, data.final_response);
+        setStatus('⚠️ Escalated to human agent', true);
+        if (activeSSE) { activeSSE.close(); activeSSE = null; }
+        document.getElementById('submit-btn').disabled = false;
+        break;
+    }
+  }
+
+  // ── UI helpers ───────────────────────────────────────────────────────────────
+
+  function setStatus(html, isError) {
+    const el = document.getElementById('pipeline-status');
+    el.innerHTML = html;
+    el.style.color = isError ? 'var(--red)' : 'var(--muted)';
+  }
+
+  function addInfoCard(label, tags) {
+    const card = document.createElement('div');
+    card.className = 'step-card';
+    card.innerHTML = `
+      <div class="step-header">
+        <span class="step-label">${label}</span>
+        <span class="step-time">${now()}</span>
+      </div>
+      <div class="step-tags">${tags.filter(Boolean).map(t => `<span class="tag ${t.color || ''}">${t.label}: ${t.value}</span>`).join('')}</div>
+    `;
+    appendCard(card);
+  }
+
+  function addStepCard(label, tags, passage = null, variant = '') {
+    const card = document.createElement('div');
+    card.className = `step-card ${variant}`;
+    const tagsHtml = tags.filter(Boolean).filter(t => t.value !== '').map(t =>
+      `<span class="tag ${t.color || ''}">${t.label}${t.value ? ': ' + t.value : ''}</span>`
+    ).join('');
+    const passageHtml = passage
+      ? `<div class="step-passage">"${passage}"</div>`
+      : '';
+    card.innerHTML = `
+      <div class="step-header">
+        <span class="step-label">${label}</span>
+        <span class="step-time">${now()}</span>
+      </div>
+      <div class="step-tags">${tagsHtml}</div>
+      ${passageHtml}
+    `;
+    appendCard(card);
+  }
+
+  function appendCard(card) {
+    const container = document.getElementById('steps-container');
+    container.appendChild(card);
+    container.scrollTop = container.scrollHeight;
+  }
+
+  function showFinalResponse(action, refund, text) {
+    const panel = document.getElementById('response-panel');
+    const meta  = document.getElementById('response-meta');
+    const body  = document.getElementById('final-response-text');
+
+    meta.innerHTML = `
+      <span class="tag green">Action: ${formatAction(action)}</span>
+      ${refund > 0 ? `<span class="tag yellow">Refund: $${refund.toFixed(2)}</span>` : ''}
+    `;
+    body.textContent = text || '—';
+    panel.style.display = 'block';
+    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function formatCategory(cat) {
+    return (cat || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  }
+
+  function formatAction(action) {
+    return (action || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  }
+
+  function now() {
+    return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  }
+</script>
+
+</body>
+</html>
